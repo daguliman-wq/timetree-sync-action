@@ -87,9 +87,11 @@ def sync():
     raw_events = client.get_events(calendar)
     desired = {target: [] for target in mapping.values()} if mapping else {Config.GOOGLE_CALENDAR_ID: []}
     seen = set()
+    excluded = 0
     for raw in raw_events:
         target = targets.get(_label_id(raw)) if mapping else Config.GOOGLE_CALENDAR_ID
         if target is None:
+            excluded += 1
             continue
         event = Event.from_timetree(raw)
         event.id = str(event.id)
@@ -97,6 +99,9 @@ def sync():
             raise RuntimeError("Duplicate TimeTree event ID in source snapshot")
         seen.add(event.id)
         desired[target].append(event)
+    for name, target in mapping.items():
+        logger.info("Label desired: %s=%d", name, len(desired[target]))
+    logger.info("Source snapshot: included=%d excluded=%d", len(seen), excluded)
     google = GoogleCalendarClient(Config.GOOGLE_SERVICE_ACCOUNT_JSON)
     # Preflight all calendars before any writes or cleanup.
     for target in set(desired) | {Config.GOOGLE_CALENDAR_ID}:
